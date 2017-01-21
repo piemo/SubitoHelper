@@ -10,11 +10,11 @@ namespace SubitoNotifier.Helper
 {
     public static class SQLHelper
     {
-        public static LatestInsertion GetLatestInsertionID(string product)
+        public static LatestInsertion GetLatestInsertionID(string parameters)
         {
             string connStr = ConfigurationManager.ConnectionStrings["SubitoNotifier"].ToString();
             LatestInsertion latestInsertion = null;
-            var script = $"select top(1) id, subitoId from recentProducts_tb where product = '{product}'";
+            var script = $"select top(1) id, subitoId from recentProducts_tb where parameters = '{parameters}'";
 
             using (var conn = new SqlConnection(connStr))
             {
@@ -36,11 +36,11 @@ namespace SubitoNotifier.Helper
             return latestInsertion;
         }
 
-        public static LatestInsertion InsertLatestInsertion(int fisrtId, string product)
+        public static LatestInsertion InsertLatestInsertion(int fisrtId, string parameters)
         {
             string connStr = ConfigurationManager.ConnectionStrings["SubitoNotifier"].ToString();
             LatestInsertion latestInsertion = new LatestInsertion();
-            var script = $"insert into recentProducts_tb(subitoId, product, insertedAt) values({fisrtId}, '{product}', CONVERT(datetime, '{DateTime.Now}', 101))";
+            var script = $"insert into recentProducts_tb(subitoId, parameters, insertedAt) values({fisrtId}, '{parameters}', CONVERT(datetime, '{DateTime.Now}', 101))";
 
             using (var conn = new SqlConnection(connStr))
             {
