@@ -1,5 +1,7 @@
 # SubitoHelper
 
-Tool to automize the usage of the website.it 
+Tool to automize the usage of subito.it 
 
-Automatic notifications about the latest insertions of any item in any category and working on automating the renewal of your own insertions (to keep the top spot always).
+Since the developers of the official application and webiste won't give the user the possibility to get notifications and automatic bumps of your insertions, I just did it myself. 
+
+This is intended for personal use, so I won't give anyone any documentation on how to use it.
