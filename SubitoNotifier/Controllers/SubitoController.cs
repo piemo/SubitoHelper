@@ -75,13 +75,13 @@ namespace SubitoNotifier.Controllers
 
                 string subitoResponse = await GetSubitoResponse(parameter);
                 var insertions = JsonConvert.DeserializeObject<Insertions>(subitoResponse);
-                if(insertions.count_all>0)
+                if(insertions.ads.Count>0)
                 {
                     var firstId = insertions.GetFirstId();
                     var latestInsertion = SQLHelper.GetLatestInsertionID(this.searchText);
                     if (latestInsertion == null)
                     {
-                        SQLHelper.InsertLatestInsertion(firstId, $"{searchText},c{category},r{region},c{city})");
+                        SQLHelper.InsertLatestInsertion(firstId, this.searchText);
                     }
                     else if (firstId > latestInsertion.SubitoId)
                     {

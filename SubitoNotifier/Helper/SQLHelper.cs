@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
 using System.Web;
 
@@ -40,7 +41,9 @@ namespace SubitoNotifier.Helper
         {
             string connStr = ConfigurationManager.ConnectionStrings["SubitoNotifier"].ToString();
             LatestInsertion latestInsertion = new LatestInsertion();
-            var script = $"insert into recentProducts_tb(subitoId, parameters, insertedAt) values({fisrtId}, '{parameters}', CONVERT(datetime, '{DateTime.Now}', 101))";
+            CultureInfo info = new CultureInfo("en-US");
+            DateTime now = DateTime.Now;
+            var script = $"insert into recentProducts_tb(subitoId, parameters, insertedAt) values({fisrtId}, '{parameters}', CONVERT(datetime, '{now.ToString(info)}', 101))";
 
             using (var conn = new SqlConnection(connStr))
             {
@@ -57,7 +60,9 @@ namespace SubitoNotifier.Helper
         {
             string connStr = ConfigurationManager.ConnectionStrings["SubitoNotifier"].ToString();
             LatestInsertion latestInsertion = new LatestInsertion();
-            var script = $"update recentProducts_tb set SubitoID = {newLatestInsertion.SubitoId}, updatedAt = CONVERT(datetime, '{DateTime.Now}', 101) where id = {newLatestInsertion.Id}";
+            CultureInfo info = new CultureInfo("en-US");
+            DateTime now = DateTime.Now;
+            var script = $"update recentProducts_tb set SubitoID = {newLatestInsertion.SubitoId}, insertedAt = CONVERT(datetime, '{now.ToString(info)}', 101) where id = {newLatestInsertion.Id}";
 
             using (var conn = new SqlConnection(connStr))
             {
