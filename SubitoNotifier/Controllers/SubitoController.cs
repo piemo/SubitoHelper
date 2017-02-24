@@ -77,19 +77,31 @@ namespace SubitoNotifier.Controllers
                 var insertions = JsonConvert.DeserializeObject<Insertions>(subitoResponse);
                 if(insertions.ads.Count>0)
                 {
-                    var firstId = insertions.GetFirstId();
+                    List<Ad> newAds = new List<Ad>();
+                    var firstId = insertions.GetFirstAdId();
                     var latestInsertion = SQLHelper.GetLatestInsertionID(this.searchText);
                     if (latestInsertion == null)
                     {
+                        newAds.Add(insertions.ads.FirstOrDefault());
                         SQLHelper.InsertLatestInsertion(firstId, this.searchText);
                     }
                     else if (firstId > latestInsertion.SubitoId)
                     {
                         latestInsertion.SubitoId = firstId;
                         SQLHelper.UpdateLatestInsertion(latestInsertion);
+                        int currentId = firstId;
+                        for (int i = 0; currentId > latestInsertion.SubitoId && i < insertions.ads.Count(); i++)
+                        {
+                            currentId = SubitoHelper.GetAdId(insertions.ads.ElementAt(i));
+                            newAds.Add(insertions.ads.ElementAt(i));
+                        }
+                        latestInsertion.SubitoId = firstId;
                     }
 
-                    //await sendTelegramInsertion(botToken, $"-{chatToken}", this.searchText, insertions.ads.FirstOrDefault());
+                    foreach(Ad ad in newAds)
+                    {
+                        await sendTelegramInsertion(botToken, $"-{chatToken}", this.searchText, ad);
+                    }
                 }
                 return $"Controllato {DateTime.Now}";
             }
@@ -129,8 +141,6 @@ namespace SubitoNotifier.Controllers
         //        {
 
         //        }
-
-
         //        if (latestInsertion == null)
         //        {
         //            SQLHelper.InsertLatestInsertion(idsToCheck.FirstOrDefault(), product);

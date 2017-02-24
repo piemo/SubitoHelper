@@ -9,9 +9,16 @@ namespace SubitoNotifier.Helper
 {
     public static class SubitoHelper
     {
-        public static int GetFirstId(this Insertions insertions)
+        public static int GetFirstAdId(this Insertions insertions)
         {
-            var firstInsertionUrl = insertions.ads.FirstOrDefault()?.urls?.@default;
+            var firstId = GetAdId(insertions.ads.FirstOrDefault());
+            return firstId;
+        }
+
+        public static int GetAdId(this Ad ad)
+        {
+
+            var firstInsertionUrl = ad.urls?.@default;
             if (firstInsertionUrl == null)
                 throw new ArgumentNullException("firstInsertionUrl");
             var groups = Regex.Match(firstInsertionUrl, @"https?:\/\/www.*\/(?<id>\d+).*").Groups;
