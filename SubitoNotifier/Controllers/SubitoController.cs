@@ -19,7 +19,10 @@ using SubitoNotifier.Results;
 using Newtonsoft.Json;
 using SubitoNotifier.Helper;
 using System.Linq;
-using Telegram.Bot;
+using System.Net;
+using System.IO;
+using System.Text;
+
 
 namespace SubitoNotifier.Controllers
 {
@@ -100,7 +103,7 @@ namespace SubitoNotifier.Controllers
 
                     foreach(Ad ad in newAds)
                     {
-                        await sendTelegramInsertion(botToken, $"-{chatToken}", this.searchText, ad);
+                        await SubitoHelper.sendTelegramInsertion(botToken, $"-{chatToken}", this.searchText, ad);
                     }
                 }
                 return $"Controllato {DateTime.Now}";
@@ -111,6 +114,21 @@ namespace SubitoNotifier.Controllers
             }
         }
 
+        [Route("GetReinsertAll")]
+        public async Task<string> GetReinsertAll(string username = "", string password = "", string addressNewInserions = "")
+        {
+            try
+            {
+                SubitoWebClient webClient = new SubitoWebClient();
+                SubitoLoginDetail loginData = await HttpHelper.LoginSubito(username,password,webClient);
+
+                return $"inserzioni rimosse e riaggiunte {DateTime.Now}";
+            }
+            catch (Exception ex)
+            {
+                return ex.ToString();
+            }
+        }
 
         //[Route("InsertionBySellerName")]
         //public async Task<string> GetInsertionBySellerName(string token, string sellerName)
@@ -159,17 +177,6 @@ namespace SubitoNotifier.Controllers
         //    }
         //}
 
-        private async Task<Telegram.Bot.Types.Message> sendTelegramInsertion(string botToken, string chatToken, string searchtext, Ad insertion)
-        {
-            var message = $"{searchText}: {insertion.features.FirstOrDefault(x => x.label == "Prezzo")?.values?.FirstOrDefault()?.value}\n{insertion.subject}\n\n{insertion.body}\n\n{insertion.urls.@default}";
-            return await sendTelegramMessage(botToken, chatToken, searchText, message);
-        }
-
-        private async Task<Telegram.Bot.Types.Message> sendTelegramMessage(string botToken, string chatToken, string searchtext, string message)
-        {
-            var bot = new TelegramBotClient(botToken);
-            return await bot.SendTextMessageAsync(chatToken, message);
-        }
 
         private async Task<string> GetSubitoResponse(string parameter)
         {
@@ -188,4 +195,6 @@ namespace SubitoNotifier.Controllers
         }
 
     }
+
+    
 }

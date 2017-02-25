@@ -221,8 +221,10 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Helper\CookieAwareWebClient.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Helper\HttpHelper.cs" />
-    <Compile Include="Helper\MailGunHelper.cs" />
     <Compile Include="Helper\SQLHelper.cs" />
     <Compile Include="Helper\SubitoHelper.cs" />
     <Compile Include="Models\AccountBindingModels.cs" />
@@ -230,6 +232,7 @@
     <Compile Include="Models\IdentityModels.cs" />
     <Compile Include="Models\Insertions.cs" />
     <Compile Include="Models\LatestInsertion.cs" />
+    <Compile Include="Models\SubitoLoginDetail.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Providers\ApplicationOAuthProvider.cs" />
     <Compile Include="Results\ChallengeResult.cs" />

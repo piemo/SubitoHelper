@@ -1,6 +1,8 @@
 ﻿using Newtonsoft.Json;
+using SubitoNotifier.Models;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -28,6 +30,17 @@ namespace SubitoNotifier.Helper
             response.EnsureSuccessStatusCode(); //will throw an exception if not successful
             string content = await response.Content.ReadAsStringAsync();
             return content;
+        }
+
+        public static async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient)
+        {
+            string loginString = "{ \"password\":\"" + password + "\",\"remember_me\":true,\"username\":\"" + username + "\"}";
+            WebResponse response = webClient.getLoginResponse(loginString);
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                string responseString = reader.ReadToEnd(); // do something fun...
+                return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
+            }
         }
     }
 }

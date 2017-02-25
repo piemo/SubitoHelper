@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Web;
+using Telegram.Bot;
 
 namespace SubitoNotifier.Helper
 {
@@ -49,10 +51,18 @@ namespace SubitoNotifier.Helper
             return ids.ToList();
         }
 
-        //public static IList<int> GetNew(this Insertions insertions, LatestInsertion latestInsertion)
-        //{
-        //    var ids = insertions.GetIds().Where(x => x > latestInsertion.SubitoId).OrderBy(x=>x).ToList();
-            
-        //}
+        public static async Task<Telegram.Bot.Types.Message> sendTelegramInsertion(string botToken, string chatToken, string searchText, Ad insertion)
+        {
+            var message = $"{searchText}: {insertion.features.FirstOrDefault(x => x.label == "Prezzo")?.values?.FirstOrDefault()?.value}\n{insertion.subject}\n\n{insertion.body}\n\n{insertion.urls.@default}";
+            return await sendTelegramMessage(botToken, chatToken, searchText, message);
+        }
+
+        private static async Task<Telegram.Bot.Types.Message> sendTelegramMessage(string botToken, string chatToken, string searchtext, string message)
+        {
+            var bot = new TelegramBotClient(botToken);
+            return await bot.SendTextMessageAsync(chatToken, message);
+        }
+
+
     }
 }
