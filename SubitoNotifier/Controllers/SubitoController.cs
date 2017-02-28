@@ -29,9 +29,12 @@ namespace SubitoNotifier.Controllers
     [RoutePrefix("api/Subito")]
     public class SubitoController : ApiController
     {
+        string URL = "https://hades.subito.it/v1";  //url base subito per richieste senza cookies
+        string COOKIESURL = "https://ade.subito.it/v1"; // url base subito per richieste con cookies
+        string LOGINURL = "https://ade.subito.it/v1/users/login";
+
         private const string LocalLoginProvider = "Local";
         private ApplicationUserManager _userManager;
-        string URL = "https://hades.subito.it/v1/search/ads?";  //url base subito
         string maxNum;          //quantità massima di inserzioni restituite
         string pin;             //da capire
         string searchText;      //stringa ricercata
@@ -62,7 +65,7 @@ namespace SubitoNotifier.Controllers
                 this.category = Uri.EscapeDataString(category.ToString());
                 this.city = Uri.EscapeDataString(city.ToString());
                 this.region = Uri.EscapeDataString(region.ToString());
-                string parameter = $"lim={this.maxNum}&pin={this.pin}&sort={this.sort}&t={this.typeIns}";
+                string parameter = $"/search/ads?lim={this.maxNum}&pin={this.pin}&sort={this.sort}&t={this.typeIns}";
 
                 if (this.category != "")
                     parameter += $"&c={this.category}";
@@ -76,7 +79,8 @@ namespace SubitoNotifier.Controllers
                 if (this.searchText != "")
                     parameter += $"&q={this.searchText}";
 
-                string subitoResponse = await GetSubitoResponse(parameter);
+                SubitoWebClient webClient = new SubitoWebClient();
+                string subitoResponse = await webClient.DownloadStringTaskAsync(new Uri(URL + parameter, UriKind.Relative));
                 var insertions = JsonConvert.DeserializeObject<Insertions>(subitoResponse);
                 if(insertions.ads.Count>0)
                 {
@@ -120,7 +124,16 @@ namespace SubitoNotifier.Controllers
             try
             {
                 SubitoWebClient webClient = new SubitoWebClient();
-                SubitoLoginDetail loginData = await HttpHelper.LoginSubito(username,password,webClient);
+                SubitoLoginDetail loginData = await LoginSubito(username,password,webClient, new Uri(LOGINURL));
+
+                Uri uri = new Uri(COOKIESURL + "/users/" +  loginData.user_id + "/ads?start=0");
+                string responseString = await webClient.DownloadStringTaskAsync(uri);
+                Insertions insertions = JsonConvert.DeserializeObject<Insertions>(responseString);
+
+                foreach (Ad ad in insertions.ads){
+                    uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
+                    await webClient.DeleteRequest(uri);
+                }
 
                 return $"inserzioni rimosse e riaggiunte {DateTime.Now}";
             }
@@ -130,71 +143,19 @@ namespace SubitoNotifier.Controllers
             }
         }
 
-        //[Route("InsertionBySellerName")]
-        //public async Task<string> GetInsertionBySellerName(string token, string sellerName)
-        //{
-        //    try
-        //    {
-        //        var product = "SLLR:" + sellerName;
-        //        var t = Uri.EscapeDataString("s,u,h");
-        //        string parameter = $"lim={lim}&pin={pin}&sort=datedesc&t={t}";
-        //        string url = $"https://hades.subito.it/v1/search/ads?{parameter}";
-        //        Uri uri = new Uri(url, UriKind.Absolute);
-        //        HttpClient client = new HttpClient();
-        //        #region Headers
-        //        client.DefaultRequestHeaders.Add("Accept", "*/*");
-        //        client.DefaultRequestHeaders.Add("host", "hades.subito.it");
-        //        client.DefaultRequestHeaders.Add("X-Subito-Channel", "50");
-        //        client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36");
-        //        client.DefaultRequestHeaders.Add("Accept-Language", "it-IT;q=1, en-US;q=0.9");
-        //        client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
-        //        client.DefaultRequestHeaders.Add("Connection", "keep-alive");
-        //        #endregion
-        //        var latestInsertion = SQLHelper.GetLatestInsertionID(product);
-        //        var stringResult = await client.GetStringWithGzipAsync(uri);
-        //        var insertions = JsonConvert.DeserializeObject<Insertions>(stringResult);
-        //        var idsToCheck = insertions.GetNewIds(latestInsertion);
 
-        //        foreach (var id in idsToCheck)
-        //        {
-
-        //        }
-        //        if (latestInsertion == null)
-        //        {
-        //            SQLHelper.InsertLatestInsertion(idsToCheck.FirstOrDefault(), product);
-        //        }
-        //        else if (idsToCheck.FirstOrDefault() > latestInsertion.SubitoId)
-        //        {
-        //            latestInsertion.SubitoId = idsToCheck.FirstOrDefault();
-        //            SQLHelper.UpdateLatestInsertion(latestInsertion);
-        //        }
-
-        //        return $"Controllato {DateTime.Now}";
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return ex.ToString();
-        //    }
-        //}
-
-
-        private async Task<string> GetSubitoResponse(string parameter)
+        public static async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient, Uri uri)
         {
-            Uri uri = new Uri(URL + parameter, UriKind.Absolute);
-            HttpClient client = new HttpClient();
-            #region Headers
-            client.DefaultRequestHeaders.Add("Accept", "*/*");
-            client.DefaultRequestHeaders.Add("host", "hades.subito.it");
-            client.DefaultRequestHeaders.Add("X-Subito-Channel", "50");
-            client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36");
-            client.DefaultRequestHeaders.Add("Accept-Language", "it-IT;q=1, en-US;q=0.9");
-            client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
-            client.DefaultRequestHeaders.Add("Connection", "keep-alive");
-            #endregion
-            return await client.GetStringWithGzipAsync(uri);
+            string loginString = "{ \"password\":\"" + password + "\",\"remember_me\":true,\"username\":\"" + username + "\"}";
+            WebResponse response = await webClient.getLoginResponse(loginString, uri);
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                string responseString = reader.ReadToEnd();
+                return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
+            }
         }
 
     }
 
-    
 }
+

@@ -221,12 +221,11 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
-    <Compile Include="Helper\CookieAwareWebClient.cs">
+    <Compile Include="Helper\SubitoHelper.cs" />
+    <Compile Include="Helper\SubitoWebClient.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="Helper\HttpHelper.cs" />
     <Compile Include="Helper\SQLHelper.cs" />
-    <Compile Include="Helper\SubitoHelper.cs" />
     <Compile Include="Models\AccountBindingModels.cs" />
     <Compile Include="Models\AccountViewModels.cs" />
     <Compile Include="Models\IdentityModels.cs" />
