@@ -56,8 +56,9 @@ namespace SubitoNotifier.Helper
 
         public async Task<bool> DeleteRequest(Uri uri)
         {
-            HttpWebRequest request = (HttpWebRequest)GetWebRequest(uri);
+            var request = (HttpWebRequest)WebRequest.Create(uri);
             request.Method = "DELETE";
+            request.CookieContainer = this.CookieContainer;
             HttpWebResponse response =  (HttpWebResponse) await request.GetResponseAsync();
             if (response.StatusCode == HttpStatusCode.Accepted || response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.NoContent)
             {
