@@ -1,5 +1,7 @@
 ﻿using System;
+using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -7,7 +9,7 @@ namespace SubitoNotifier.Helper
 {
     public class SubitoWebClient : WebClient
     {
-        public async Task<WebResponse> getLoginResponse(string loginData, Uri uri)
+        public async Task<string> getLoginResponse(string loginData, Uri uri)
         {
             CookieContainer container;
 
@@ -25,7 +27,10 @@ namespace SubitoNotifier.Helper
 
             var response = await request.GetResponseAsync();
             CookieContainer = container;
-            return response;
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                return reader.ReadToEnd();
+            }
         }
 
         public SubitoWebClient(CookieContainer container)
@@ -67,6 +72,90 @@ namespace SubitoNotifier.Helper
             else
             {
                 return false;
+            }
+        }
+
+        public async Task<string> GetRequest(Uri uri)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = "GET";
+            request.CookieContainer = this.CookieContainer;
+            request.AutomaticDecompression = DecompressionMethods.GZip;
+            HttpWebResponse response = (HttpWebResponse)await request.GetResponseAsync();
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        public async Task<string> PostRequest (string message ,Uri uri)
+        {
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = "POST";
+            request.CookieContainer = this.CookieContainer;
+            request.AutomaticDecompression = DecompressionMethods.GZip;
+            request.ContentType = "application/x-www-form-urlencoded";
+
+            var buffer = Encoding.ASCII.GetBytes(message);
+            request.ContentLength = buffer.Length;
+            var requestStream = request.GetRequestStream();
+            requestStream.Write(buffer, 0, buffer.Length);
+            requestStream.Close();
+
+            var response = await request.GetResponseAsync();
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                return reader.ReadToEnd();
+            }
+        }
+
+        //public async Task<string> PostImageRequest(string imageString, int category, Uri uri)
+        //{
+        //    var request = (HttpWebRequest)WebRequest.Create(uri);
+        //    request.Method = "POST";
+        //    request.CookieContainer = this.CookieContainer;
+        //    request.AutomaticDecompression = DecompressionMethods.GZip;
+
+        //    var webClient = new WebClient();
+        //    string boundary = "__END_OF_PART__";
+        //    request.ContentType = "multipart/form-data; boundary=" + boundary;
+        //    DateTime date = DateTime.Now;
+        //    string package = string.Format("--{0}\r\nAccept-Encoding: gzip\r\nContent-Length: {1}\r\nContent-Type: image/png\r\nContent -Disposition: form-data; name=\"image\"; filename=\"{2}\"\r\ncontent-transfer-encoding: binary\r\n\r\n{3}\r\n",boundary,imageString.Length, "IMG_" + date.ToString("yyyyMMdd_HHmmss") + "__-497335034",imageString);
+        //    package += string.Format("--{0}\r\nAccept-Encoding: gzip\r\nContent-Length: {1}\r\nContent-Type: text/plain\r\nContent -Disposition: form-data; name=\"category\"\r\ncontent-transfer-encoding: binary\r\n\r\n{2}\r\n--{0}--\r\n", boundary, category.ToString().Length, category);
+
+        //    var buffer = Encoding.ASCII.GetBytes(package);
+        //    request.ContentLength = buffer.Length;
+        //    var requestStream = request.GetRequestStream();
+        //    requestStream.Write(buffer, 0, buffer.Length);
+        //    requestStream.Close();
+
+        //    var response = await request.GetResponseAsync();
+        //    using (var reader = new StreamReader(response.GetResponseStream()))
+        //    {
+        //        return reader.ReadToEnd();
+        //    }
+        //}
+
+        public async Task<string> PostImageRequest(string imageString, int category, Uri baseUri)
+        {
+            Uri uri = new Uri(baseUri.ToString() + "?category=" + category, UriKind.Absolute);
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.Method = "POST";
+            request.CookieContainer = this.CookieContainer;
+            request.AutomaticDecompression = DecompressionMethods.GZip;
+            request.ContentType = "text/plain;charset=UTF-8";
+
+            string message = "data:image/jpeg;base64," + imageString;
+            var buffer = Encoding.ASCII.GetBytes(message);
+            request.ContentLength = buffer.Length;
+            var requestStream = request.GetRequestStream();
+            requestStream.Write(buffer, 0, buffer.Length);
+            requestStream.Close();
+
+            var response = await request.GetResponseAsync();
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                return reader.ReadToEnd();
             }
         }
     }

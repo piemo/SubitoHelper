@@ -22,7 +22,8 @@ using System.Linq;
 using System.Net;
 using System.IO;
 using System.Text;
-
+using System.IO.Compression;
+using System.Drawing;
 
 namespace SubitoNotifier.Controllers
 {
@@ -79,7 +80,7 @@ namespace SubitoNotifier.Controllers
                     parameter += $"&q={this.searchText}";
 
                 SubitoWebClient webClient = new SubitoWebClient();
-                string subitoResponse = await webClient.DownloadStringTaskAsync(new Uri(URL + parameter, UriKind.Relative));
+                string subitoResponse = await webClient.DownloadStringTaskAsync(new Uri(URL + parameter, UriKind.Absolute));
                 var insertions = JsonConvert.DeserializeObject<Insertions>(subitoResponse);
                 if(insertions.ads.Count>0)
                 {
@@ -93,15 +94,12 @@ namespace SubitoNotifier.Controllers
                     }
                     else if (firstId > latestInsertion.SubitoId)
                     {
-                        latestInsertion.SubitoId = firstId;
-                        SQLHelper.UpdateLatestInsertion(latestInsertion);
-                        int currentId = firstId;
-                        for (int i = 0; currentId > latestInsertion.SubitoId && i < insertions.ads.Count(); i++)
+                        for (int i = 0; i < insertions.ads.Count() && SubitoHelper.GetAdId(insertions.ads[i]) > latestInsertion.SubitoId; i++)
                         {
-                            currentId = SubitoHelper.GetAdId(insertions.ads.ElementAt(i));
                             newAds.Add(insertions.ads.ElementAt(i));
                         }
                         latestInsertion.SubitoId = firstId;
+                        SQLHelper.UpdateLatestInsertion(latestInsertion);
                     }
 
                     foreach(Ad ad in newAds)
@@ -117,25 +115,70 @@ namespace SubitoNotifier.Controllers
             }
         }
 
+        [Route("GetDeleteAll")]
+        public async Task<string> GetDeleteAll(string username = "", string password = "")
+        {
+            try
+            {
+                SubitoWebClient subitoWebClient = new SubitoWebClient();
+                //login to get cookies
+                SubitoLoginDetail loginData = await LoginSubito(username, password, subitoWebClient, new Uri(COOKIESURL + "/users/login"));
+
+                //getting the list of own insertions
+                Uri uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads?start=0");
+                string responseString = await subitoWebClient.DownloadStringTaskAsync(uri);
+                Insertions insertions = JsonConvert.DeserializeObject<Insertions>(responseString);
+
+                //deleting insertions
+                foreach (Ad ad in insertions.ads)
+                {
+                    uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
+                    bool result = await subitoWebClient.DeleteRequest(uri);
+                    await Task.Delay(1000);
+                }
+
+                return $"inserzioni rimosse {DateTime.Now}";
+            }
+            catch (Exception ex)
+            {
+                return ex.ToString();
+            }
+        }
+
         [Route("GetReinsertAll")]
         public async Task<string> GetReinsertAll(string username = "", string password = "", string addressNewInserions = "")
         {
             try
             {
                 SubitoWebClient subitoWebClient = new SubitoWebClient();
+                Bitmap bitmap = new Bitmap(@"C:\Users\piemo\Desktop\OI0000211.jpg");
+                //login to get cookies
                 SubitoLoginDetail loginData = await LoginSubito(username,password,subitoWebClient, new Uri(COOKIESURL + "/users/login"));
 
+                //getting the list of own insertions
                 Uri uri = new Uri(COOKIESURL + "/users/" +  loginData.user_id + "/ads?start=0");
                 string responseString = await subitoWebClient.DownloadStringTaskAsync(uri);
                 Insertions insertions = JsonConvert.DeserializeObject<Insertions>(responseString);
 
-                foreach (Ad ad in insertions.ads){
-                    uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
-                    bool result = await subitoWebClient.DeleteRequest(uri);
-                    await Task.Delay(5000);
-                }
+                //inserting the new insertions.
+                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/api/v5/aij/form/0?v=5", UriKind.Absolute));
+                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/init/0?v=5&v=5", UriKind.Absolute));
+                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/load/0?v=5&v=5", UriKind.Absolute));
+                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/form/0?v=5&v=5", UriKind.Absolute));
+                
+                //check
+                await subitoWebClient.PostRequest("tos=1&ch=4&region=4&city=1&phone=3386231529&email=djpiemo%40gmail.com&body=Vendo+come+nuovo&phone_hidden=1&price=50&town=016008&category=44&company_ad=0&name=Lorenzo&subject=Gamecube&type=s", new Uri("https://api2.subito.it:8443/api/v5/aij/verify/0", UriKind.Absolute));
 
-                return $"inserzioni rimosse e riaggiunte {DateTime.Now}";
+                //inserimento foto
+                string imageToString = Convert.ToBase64String(File.ReadAllBytes(@"C:\Users\piemo\Desktop\OI0000211.png"));
+                await subitoWebClient.PostImageRequest(imageToString, 44, new Uri("https://www2.subito.it/api/v5/aij/addimage/0", UriKind.Absolute));
+                string temp = await subitoWebClient.PostImageRequest(imageToString, 44, new Uri("https://www2.subito.it/aij/addimage_form/0?v=5", UriKind.Absolute));
+                
+
+                //inserito
+                string result = await subitoWebClient.PostRequest("tos=1&ch=4&region=4&city=1&phone=3386231529&email=djpiemo%40gmail.com&body=Vendo+come+nuovo&phone_hidden=1&price=50&town=016008&category=44&company_ad=0&name=Lorenzo&subject=Gamecube&type=s",new Uri("https://api2.subito.it:8443/api/v5/aij/create/0", UriKind.Absolute));
+
+                return $"inserzioni aggiunte {DateTime.Now}";
             }
             catch (Exception ex)
             {
@@ -147,12 +190,8 @@ namespace SubitoNotifier.Controllers
         public static async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient, Uri uri)
         {
             string loginString = "{ \"password\":\"" + password + "\",\"remember_me\":true,\"username\":\"" + username + "\"}";
-            WebResponse response = await webClient.getLoginResponse(loginString, uri);
-            using (var reader = new StreamReader(response.GetResponseStream()))
-            {
-                string responseString = reader.ReadToEnd();
-                return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
-            }
+            string responseString = await webClient.getLoginResponse(loginString, uri);
+            return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
         }
 
     }
