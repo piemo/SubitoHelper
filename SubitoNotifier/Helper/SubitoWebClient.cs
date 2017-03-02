@@ -114,14 +114,13 @@ namespace SubitoNotifier.Helper
         //    var request = (HttpWebRequest)WebRequest.Create(uri);
         //    request.Method = "POST";
         //    request.CookieContainer = this.CookieContainer;
-        //    request.AutomaticDecompression = DecompressionMethods.GZip;
 
         //    var webClient = new WebClient();
         //    string boundary = "__END_OF_PART__";
         //    request.ContentType = "multipart/form-data; boundary=" + boundary;
         //    DateTime date = DateTime.Now;
-        //    string package = string.Format("--{0}\r\nAccept-Encoding: gzip\r\nContent-Length: {1}\r\nContent-Type: image/png\r\nContent -Disposition: form-data; name=\"image\"; filename=\"{2}\"\r\ncontent-transfer-encoding: binary\r\n\r\n{3}\r\n",boundary,imageString.Length, "IMG_" + date.ToString("yyyyMMdd_HHmmss") + "__-497335034",imageString);
-        //    package += string.Format("--{0}\r\nAccept-Encoding: gzip\r\nContent-Length: {1}\r\nContent-Type: text/plain\r\nContent -Disposition: form-data; name=\"category\"\r\ncontent-transfer-encoding: binary\r\n\r\n{2}\r\n--{0}--\r\n", boundary, category.ToString().Length, category);
+        //    string package = string.Format("--{0}\r\nAccept-Encoding: gzip\r\nContent-Length: {1}\r\nContent-Type: image/png\r\ncontent-disposition: form-data; name=\"image\"; filename=\"{2}\"\r\ncontent-transfer-encoding: binary\r\n\r\n{3}\r\n", boundary, imageString.Length, "IMG_" + date.ToString("yyyyMMdd_HHmmss") + "_-497335034.png", imageString);
+        //    package += string.Format("--{0}\r\nAccept-Encoding: gzip\r\nContent-Length: {1}\r\nContent-Type: text/plain\r\ncontent-disposition: form-data; name=\"category\"\r\ncontent-transfer-encoding: binary\r\n\r\n{2}\r\n--{0}--\r\n", boundary, category.ToString().Length, category);
 
         //    var buffer = Encoding.ASCII.GetBytes(package);
         //    request.ContentLength = buffer.Length;
@@ -136,17 +135,20 @@ namespace SubitoNotifier.Helper
         //    }
         //}
 
-        public async Task<string> PostImageRequest(string imageString, int category, Uri baseUri)
+
+        public async Task<string> PostImageRequest(string imageString, int category, Uri uri)
         {
-            Uri uri = new Uri(baseUri.ToString() + "?category=" + category, UriKind.Absolute);
-            var request = (HttpWebRequest)WebRequest.Create(uri);
+            Uri newUri = new Uri(uri + "?category=" + category);
+            var request = (HttpWebRequest)WebRequest.Create(newUri);
             request.Method = "POST";
             request.CookieContainer = this.CookieContainer;
-            request.AutomaticDecompression = DecompressionMethods.GZip;
-            request.ContentType = "text/plain;charset=UTF-8";
 
-            string message = "data:image/jpeg;base64," + imageString;
-            var buffer = Encoding.ASCII.GetBytes(message);
+            var webClient = new WebClient();
+            request.ContentType = "text/plain;charset=UTF-8";
+            DateTime date = DateTime.Now;
+            string package = string.Format("data:image/jpeg;base64,"+ imageString);
+
+            var buffer = Encoding.ASCII.GetBytes(package);
             request.ContentLength = buffer.Length;
             var requestStream = request.GetRequestStream();
             requestStream.Write(buffer, 0, buffer.Length);

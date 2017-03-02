@@ -151,7 +151,6 @@ namespace SubitoNotifier.Controllers
             try
             {
                 SubitoWebClient subitoWebClient = new SubitoWebClient();
-                Bitmap bitmap = new Bitmap(@"C:\Users\piemo\Desktop\OI0000211.jpg");
                 //login to get cookies
                 SubitoLoginDetail loginData = await LoginSubito(username,password,subitoWebClient, new Uri(COOKIESURL + "/users/login"));
 
@@ -169,12 +168,21 @@ namespace SubitoNotifier.Controllers
                 //check
                 await subitoWebClient.PostRequest("tos=1&ch=4&region=4&city=1&phone=3386231529&email=djpiemo%40gmail.com&body=Vendo+come+nuovo&phone_hidden=1&price=50&town=016008&category=44&company_ad=0&name=Lorenzo&subject=Gamecube&type=s", new Uri("https://api2.subito.it:8443/api/v5/aij/verify/0", UriKind.Absolute));
 
-                //inserimento foto
-                string imageToString = Convert.ToBase64String(File.ReadAllBytes(@"C:\Users\piemo\Desktop\OI0000211.png"));
-                await subitoWebClient.PostImageRequest(imageToString, 44, new Uri("https://www2.subito.it/api/v5/aij/addimage/0", UriKind.Absolute));
-                string temp = await subitoWebClient.PostImageRequest(imageToString, 44, new Uri("https://www2.subito.it/aij/addimage_form/0?v=5", UriKind.Absolute));
-                
+                //inserimento 
+                //string temptemp = "";
+                //using (BinaryReader br = new BinaryReader(File.Open(@"C:\Users\piemo\Desktop\IMG_20170219_091555.png", FileMode.Open)))
+                //{
+                //    var data = br.ReadChars((int)br.BaseStream.Length);
+                //    StringBuilder sb = new StringBuilder();
+                //    foreach (char c in data)
+                //        if ((int)c > 0) sb.Append(c.ToString()); else sb.Append(".");
+                //    temptemp = sb.ToString();
+                //}
+                string imageToString = Convert.ToBase64String(File.ReadAllBytes(@"C:\Users\piemo\Desktop\IMG_20170219_091555.jpg"));
 
+                var response = await subitoWebClient.PostImageRequest(imageToString, 44, new Uri("https://api2.subito.it:8443/api/v5/aij/addimage/0", UriKind.Absolute));
+                response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/addimage_form/0?v=5&category=44", UriKind.Absolute));
+                
                 //inserito
                 string result = await subitoWebClient.PostRequest("tos=1&ch=4&region=4&city=1&phone=3386231529&email=djpiemo%40gmail.com&body=Vendo+come+nuovo&phone_hidden=1&price=50&town=016008&category=44&company_ad=0&name=Lorenzo&subject=Gamecube&type=s",new Uri("https://api2.subito.it:8443/api/v5/aij/create/0", UriKind.Absolute));
 
