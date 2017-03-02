@@ -116,23 +116,21 @@ namespace SubitoNotifier.Controllers
         }
 
         [Route("GetDeleteAll")]
-        public async Task<string> GetDeleteAll(string username = "", string password = "")
+        public async Task<string> GetDeleteAll(string username , string password)
         {
             try
             {
                 SubitoWebClient subitoWebClient = new SubitoWebClient();
                 //login to get cookies
-                SubitoLoginDetail loginData = await LoginSubito(username, password, subitoWebClient, new Uri(COOKIESURL + "/users/login"));
+                SubitoLoginDetail loginData = await LoginSubito(username, password, subitoWebClient);
 
                 //getting the list of own insertions
-                Uri uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads?start=0");
-                string responseString = await subitoWebClient.DownloadStringTaskAsync(uri);
-                Insertions insertions = JsonConvert.DeserializeObject<Insertions>(responseString);
+                Insertions insertions = await GetUserInsertionsByID(loginData.user_id, subitoWebClient);
 
                 //deleting insertions
                 foreach (Ad ad in insertions.ads)
                 {
-                    uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
+                    Uri uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
                     bool result = await subitoWebClient.DeleteRequest(uri);
                     await Task.Delay(1000);
                 }
@@ -146,45 +144,24 @@ namespace SubitoNotifier.Controllers
         }
 
         [Route("GetReinsertAll")]
-        public async Task<string> GetReinsertAll(string username = "", string password = "", string addressNewInserions = "")
+        public async Task<string> GetReinsertAll(string username, string password , string addressNewInsertions )
         {
             try
             {
                 SubitoWebClient subitoWebClient = new SubitoWebClient();
+                
                 //login to get cookies
-                SubitoLoginDetail loginData = await LoginSubito(username,password,subitoWebClient, new Uri(COOKIESURL + "/users/login"));
+                SubitoLoginDetail loginData = await LoginSubito(username,password,subitoWebClient);
 
-                //getting the list of own insertions
-                Uri uri = new Uri(COOKIESURL + "/users/" +  loginData.user_id + "/ads?start=0");
-                string responseString = await subitoWebClient.DownloadStringTaskAsync(uri);
-                Insertions insertions = JsonConvert.DeserializeObject<Insertions>(responseString);
+                // Getting the list of insertions to post from a json on pastebin.com
+                List<NewInsertion> newInsertions = new List<NewInsertion>();
+                string responseString = await subitoWebClient.DownloadStringTaskAsync(new Uri("http://pastebin.com/raw/"+ addressNewInsertions));
+                newInsertions = JsonConvert.DeserializeObject<List<NewInsertion>>(responseString);
 
-                //inserting the new insertions.
-                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/api/v5/aij/form/0?v=5", UriKind.Absolute));
-                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/init/0?v=5&v=5", UriKind.Absolute));
-                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/load/0?v=5&v=5", UriKind.Absolute));
-                await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/form/0?v=5&v=5", UriKind.Absolute));
-                
-                //check
-                await subitoWebClient.PostRequest("tos=1&ch=4&region=4&city=1&phone=3386231529&email=djpiemo%40gmail.com&body=Vendo+come+nuovo&phone_hidden=1&price=50&town=016008&category=44&company_ad=0&name=Lorenzo&subject=Gamecube&type=s", new Uri("https://api2.subito.it:8443/api/v5/aij/verify/0", UriKind.Absolute));
-
-                //inserimento 
-                //string temptemp = "";
-                //using (BinaryReader br = new BinaryReader(File.Open(@"C:\Users\piemo\Desktop\IMG_20170219_091555.png", FileMode.Open)))
-                //{
-                //    var data = br.ReadChars((int)br.BaseStream.Length);
-                //    StringBuilder sb = new StringBuilder();
-                //    foreach (char c in data)
-                //        if ((int)c > 0) sb.Append(c.ToString()); else sb.Append(".");
-                //    temptemp = sb.ToString();
-                //}
-                string imageToString = Convert.ToBase64String(File.ReadAllBytes(@"C:\Users\piemo\Desktop\IMG_20170219_091555.jpg"));
-
-                var response = await subitoWebClient.PostImageRequest(imageToString, 44, new Uri("https://api2.subito.it:8443/api/v5/aij/addimage/0", UriKind.Absolute));
-                response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/addimage_form/0?v=5&category=44", UriKind.Absolute));
-                
-                //inserito
-                string result = await subitoWebClient.PostRequest("tos=1&ch=4&region=4&city=1&phone=3386231529&email=djpiemo%40gmail.com&body=Vendo+come+nuovo&phone_hidden=1&price=50&town=016008&category=44&company_ad=0&name=Lorenzo&subject=Gamecube&type=s",new Uri("https://api2.subito.it:8443/api/v5/aij/create/0", UriKind.Absolute));
+                foreach(NewInsertion ins in newInsertions)
+                {
+                    string result = await PostNewInsertion(ins, subitoWebClient);
+                }
 
                 return $"inserzioni aggiunte {DateTime.Now}";
             }
@@ -194,9 +171,39 @@ namespace SubitoNotifier.Controllers
             }
         }
 
-
-        public static async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient, Uri uri)
+        public async Task<string> PostNewInsertion(NewInsertion newInsertion, SubitoWebClient subitoWebClient)
         {
+            //calling the webservices to initiate the request of a new insertion.
+            string response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/api/v5/aij/form/0?v=5", UriKind.Absolute));
+            response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/init/0?v=5&v=5", UriKind.Absolute));
+            response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/load/0?v=5&v=5", UriKind.Absolute));
+            response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/form/0?v=5&v=5", UriKind.Absolute));
+            //check
+            response = await subitoWebClient.PostRequest(newInsertion.ToString(), new Uri("https://api2.subito.it:8443/api/v5/aij/verify/0", UriKind.Absolute));
+
+            //inserimento 
+            foreach(string imageAddress in newInsertion.images)
+            {
+                string imageToString = Convert.ToBase64String(subitoWebClient.DownloadData(new Uri(imageAddress)));
+                response = await subitoWebClient.PostImageRequest(imageToString, newInsertion.Category, new Uri("https://api2.subito.it:8443/api/v5/aij/addimage/0", UriKind.Absolute));
+                response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/addimage_form/0?v=5&category="+ newInsertion.Category, UriKind.Absolute));
+            }
+
+            //inserito
+            response = await subitoWebClient.PostRequest(newInsertion.ToString(), new Uri("https://api2.subito.it:8443/api/v5/aij/create/0", UriKind.Absolute));
+            return response;
+        }
+
+        public async Task<Insertions> GetUserInsertionsByID(int id, SubitoWebClient subitoWebClient)
+        {
+            Uri uri = new Uri(COOKIESURL + "/users/" + id + "/ads?start=0");
+            string responseString = await subitoWebClient.DownloadStringTaskAsync(uri);
+            return JsonConvert.DeserializeObject<Insertions>(responseString);
+        }
+
+        public async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient)
+        {
+            Uri uri=  new Uri(COOKIESURL + "/users/login");
             string loginString = "{ \"password\":\"" + password + "\",\"remember_me\":true,\"username\":\"" + username + "\"}";
             string responseString = await webClient.getLoginResponse(loginString, uri);
             return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
