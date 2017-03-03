@@ -23,7 +23,7 @@ namespace SubitoNotifier.Models
         public string Subject { get; set; }
         public List<string> images { get; set; }
 
-        public override string ToString()
+        public override string ToString() //method to be used when inserting a new add. return an encoded string which must be used
         {
 
             return $"tos={tos}&ch={ch}&region={Region}&city={City}&phone={Phone}&email={HttpUtility.UrlEncode(Email)}&body={HttpUtility.UrlEncode(Body)}&phone_hidden={Phone_hidden}&price={Price}&town={Town}&category={Category}&company_ad={company_ad}&name={Name}&subject={Subject}&type={type}";

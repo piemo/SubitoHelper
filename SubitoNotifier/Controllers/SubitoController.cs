@@ -62,38 +62,40 @@ namespace SubitoNotifier.Controllers
         {
             try
             {
+                //composing the string to be put as a parameter in the GetRequest to subito
                 this.searchText = Uri.EscapeDataString(searchText);
                 this.category = Uri.EscapeDataString(category.ToString());
                 this.city = Uri.EscapeDataString(city.ToString());
                 this.region = Uri.EscapeDataString(region.ToString());
-                string parameter = $"/search/ads?lim={this.maxNum}&pin={this.pin}&sort={this.sort}&t={this.typeIns}";
+                string parameters = $"/search/ads?lim={this.maxNum}&pin={this.pin}&sort={this.sort}&t={this.typeIns}";
 
                 if (this.category != "")
-                    parameter += $"&c={this.category}";
+                    parameters += $"&c={this.category}";
 
                 if (this.city != "")
-                    parameter += $"&ci={this.city}";
+                    parameters += $"&ci={this.city}";
 
                 if (this.region != "")
-                    parameter += $"&r={this.region}";
+                    parameters += $"&r={this.region}";
 
                 if (this.searchText != "")
-                    parameter += $"&q={this.searchText}";
+                    parameters += $"&q={this.searchText}";
 
-                SubitoWebClient webClient = new SubitoWebClient();
-                string subitoResponse = await webClient.DownloadStringTaskAsync(new Uri(URL + parameter, UriKind.Absolute));
-                var insertions = JsonConvert.DeserializeObject<Insertions>(subitoResponse);
+                //gets the list of insertion by calling the async method
+                Insertions insertions = await getListInsertions(parameters);
+
+                //begind working on the list received
                 if(insertions.ads.Count>0)
                 {
-                    List<Ad> newAds = new List<Ad>();
+                    List<Ad> newAds = new List<Ad>(); //these are the new insertions to be sent by the telegram bot
                     var firstId = insertions.GetFirstAdId();
-                    var latestInsertion = SQLHelper.GetLatestInsertionID(this.searchText);
-                    if (latestInsertion == null)
+                    var latestInsertion = SQLHelper.GetLatestInsertionID(parameters); //grab the id of the last checked insertion with the same parameters
+                    if (latestInsertion == null) // if there is no id, it means this is a new search
                     {
                         newAds.Add(insertions.ads.FirstOrDefault());
-                        SQLHelper.InsertLatestInsertion(firstId, this.searchText);
+                        SQLHelper.InsertLatestInsertion(firstId, parameters); // insert a new line with these parameters
                     }
-                    else if (firstId > latestInsertion.SubitoId)
+                    else if (firstId > latestInsertion.SubitoId) //if there is an id, we just update the line with the new top id and send all the new insertions to the telegram bot
                     {
                         for (int i = 0; i < insertions.ads.Count() && SubitoHelper.GetAdId(insertions.ads[i]) > latestInsertion.SubitoId; i++)
                         {
@@ -103,9 +105,10 @@ namespace SubitoNotifier.Controllers
                         SQLHelper.UpdateLatestInsertion(latestInsertion);
                     }
 
-                    foreach(Ad ad in newAds)
+                    //this sends the messages to telegram
+                    foreach (Ad ad in newAds) 
                     {
-                        await SubitoHelper.sendTelegramInsertion(botToken, $"-{chatToken}", this.searchText, ad);
+                        await SubitoHelper.sendTelegramInsertion(botToken, $"-{chatToken}", searchText, ad);
                     }
                 }
                 return $"Controllato {DateTime.Now}";
@@ -132,7 +135,7 @@ namespace SubitoNotifier.Controllers
                 //deleting insertions
                 foreach (Ad ad in insertions.ads)
                 {
-                    bool result = await DeleteInsertion(loginData, ad, subitoWebClient);
+                    bool result = await DeleteInsertion(loginData.user_id, ad, subitoWebClient);
                     //if it couldn't delete the ad, throw an exception
                     if (result == false)
                         throw(new Exception());
@@ -141,7 +144,7 @@ namespace SubitoNotifier.Controllers
                     await Task.Delay(1000);
                 }
 
-                return $"inserzioni rimosse {DateTime.Now}";
+                return $"{insertions.ads.Count} inserzioni rimosse {DateTime.Now}";
             }
             catch (Exception ex)
             {
@@ -173,7 +176,7 @@ namespace SubitoNotifier.Controllers
                     await Task.Delay(1000);
                 }
 
-                return $"inserzioni aggiunte {DateTime.Now}";
+                return $"{newInsertions.Count} inserzioni aggiunte {DateTime.Now}";
             }
             catch (Exception ex)
             {
@@ -217,20 +220,27 @@ namespace SubitoNotifier.Controllers
 
         public async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient)
         {
-            //login
-            Uri uri=  new Uri(COOKIESURL + "/users/login");
+            //login. the uri and the body of the request must be formatted like this
+            Uri uri =  new Uri(COOKIESURL + "/users/login");
             string loginString = "{ \"password\":\"" + password + "\",\"remember_me\":true,\"username\":\"" + username + "\"}";
             string responseString = await webClient.getLoginResponse(loginString, uri);
             return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
         }
 
-        public async Task<bool> DeleteInsertion(SubitoLoginDetail loginData, Ad ad,SubitoWebClient subitoWebClient)
+        public async Task<bool> DeleteInsertion(int userID, Ad ad,SubitoWebClient subitoWebClient)
         {
-            Uri uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
+            //delete request. the uri must be formatted like this
+            Uri uri = new Uri(COOKIESURL + "/users/" + userID + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
             bool result = await subitoWebClient.DeleteRequest(uri);
             return result;
         }
 
+        public async Task<Insertions> getListInsertions(string parameters) {
+            //this gets the list of insertions for some specified parameters. The parameters must be correctly formatted beforehand and are not checked for their syntax.
+            SubitoWebClient webClient = new SubitoWebClient();
+            string subitoResponse = await webClient.DownloadStringTaskAsync(new Uri(URL + parameters, UriKind.Absolute));
+            return JsonConvert.DeserializeObject<Insertions>(subitoResponse);
+        }
     }
 
 }
