@@ -22,6 +22,7 @@ namespace SubitoNotifier.Models
         public string Name { get; set; }
         public string Subject { get; set; }
         public List<string> images { get; set; }
+
         public override string ToString()
         {
 

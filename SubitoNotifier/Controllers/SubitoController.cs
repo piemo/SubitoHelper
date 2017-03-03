@@ -32,6 +32,7 @@ namespace SubitoNotifier.Controllers
     {
         string URL = "https://hades.subito.it/v1";  //url base subito per richieste senza cookies
         string COOKIESURL = "https://ade.subito.it/v1"; // url base subito per richieste con cookies
+        string INSERTIONURL = "https://api2.subito.it:8443"; //url per le api di inserimento nuove inserzioni
 
         private const string LocalLoginProvider = "Local";
         private ApplicationUserManager _userManager;
@@ -121,6 +122,7 @@ namespace SubitoNotifier.Controllers
             try
             {
                 SubitoWebClient subitoWebClient = new SubitoWebClient();
+
                 //login to get cookies
                 SubitoLoginDetail loginData = await LoginSubito(username, password, subitoWebClient);
 
@@ -130,8 +132,12 @@ namespace SubitoNotifier.Controllers
                 //deleting insertions
                 foreach (Ad ad in insertions.ads)
                 {
-                    Uri uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
-                    bool result = await subitoWebClient.DeleteRequest(uri);
+                    bool result = await DeleteInsertion(loginData, ad, subitoWebClient);
+                    //if it couldn't delete the ad, throw an exception
+                    if (result == false)
+                        throw(new Exception());
+
+                    //wait 1 sec
                     await Task.Delay(1000);
                 }
 
@@ -158,9 +164,13 @@ namespace SubitoNotifier.Controllers
                 string responseString = await subitoWebClient.DownloadStringTaskAsync(new Uri("http://pastebin.com/raw/"+ addressNewInsertions));
                 newInsertions = JsonConvert.DeserializeObject<List<NewInsertion>>(responseString);
 
+                //inserting each new insertion
                 foreach(NewInsertion ins in newInsertions)
                 {
                     string result = await PostNewInsertion(ins, subitoWebClient);
+
+                    //wait 1 sec
+                    await Task.Delay(1000);
                 }
 
                 return $"inserzioni aggiunte {DateTime.Now}";
@@ -173,29 +183,33 @@ namespace SubitoNotifier.Controllers
 
         public async Task<string> PostNewInsertion(NewInsertion newInsertion, SubitoWebClient subitoWebClient)
         {
-            //calling the webservices to initiate the request of a new insertion.
-            string response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/api/v5/aij/form/0?v=5", UriKind.Absolute));
-            response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/init/0?v=5&v=5", UriKind.Absolute));
-            response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/load/0?v=5&v=5", UriKind.Absolute));
-            response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/form/0?v=5&v=5", UriKind.Absolute));
-            //check
-            response = await subitoWebClient.PostRequest(newInsertion.ToString(), new Uri("https://api2.subito.it:8443/api/v5/aij/verify/0", UriKind.Absolute));
+            //calling these services to initiate the insertion procedure. can't skip these
+            string response = await subitoWebClient.GetRequest(new Uri(INSERTIONURL + "/api/v5/aij/form/0?v=5", UriKind.Absolute));
+            response = await subitoWebClient.GetRequest(new Uri(INSERTIONURL + "/aij/init/0?v=5&v=5", UriKind.Absolute));
+            response = await subitoWebClient.GetRequest(new Uri(INSERTIONURL + "/aij/load/0?v=5&v=5", UriKind.Absolute));
+            response = await subitoWebClient.GetRequest(new Uri(INSERTIONURL + "/aij/form/0?v=5&v=5", UriKind.Absolute));
 
-            //inserimento 
-            foreach(string imageAddress in newInsertion.images)
+            //check if the insertion with the datas (body, title etc) cab be posted with those datas
+            response = await subitoWebClient.PostRequest(newInsertion.ToString(), new Uri(INSERTIONURL + "/api/v5/aij/verify/0", UriKind.Absolute));
+
+            //inserting images
+            foreach (string imageAddress in newInsertion.images)
             {
+                //downloading the image from imgur first. The link is in the pastebin json file
                 string imageToString = Convert.ToBase64String(subitoWebClient.DownloadData(new Uri(imageAddress)));
-                response = await subitoWebClient.PostImageRequest(imageToString, newInsertion.Category, new Uri("https://api2.subito.it:8443/api/v5/aij/addimage/0", UriKind.Absolute));
-                response = await subitoWebClient.GetRequest(new Uri("https://api2.subito.it:8443/aij/addimage_form/0?v=5&category="+ newInsertion.Category, UriKind.Absolute));
+                //sending the image
+                response = await subitoWebClient.PostImageRequest(imageToString, newInsertion.Category, new Uri(INSERTIONURL + "/api/v5/aij/addimage/0", UriKind.Absolute));
+                //checking if the upload is ok. can't skip this
+                response = await subitoWebClient.GetRequest(new Uri(INSERTIONURL + "/aij/addimage_form/0?v=5&category=" + newInsertion.Category, UriKind.Absolute));
             }
 
-            //inserito
-            response = await subitoWebClient.PostRequest(newInsertion.ToString(), new Uri("https://api2.subito.it:8443/api/v5/aij/create/0", UriKind.Absolute));
-            return response;
+            //confirm the insertion
+            return await subitoWebClient.PostRequest(newInsertion.ToString(), new Uri(INSERTIONURL + "/api/v5/aij/create/0", UriKind.Absolute));
         }
 
         public async Task<Insertions> GetUserInsertionsByID(int id, SubitoWebClient subitoWebClient)
         {
+            //downloading the string of ads
             Uri uri = new Uri(COOKIESURL + "/users/" + id + "/ads?start=0");
             string responseString = await subitoWebClient.DownloadStringTaskAsync(uri);
             return JsonConvert.DeserializeObject<Insertions>(responseString);
@@ -203,10 +217,18 @@ namespace SubitoNotifier.Controllers
 
         public async Task<SubitoLoginDetail> LoginSubito(string username, string password, SubitoWebClient webClient)
         {
+            //login
             Uri uri=  new Uri(COOKIESURL + "/users/login");
             string loginString = "{ \"password\":\"" + password + "\",\"remember_me\":true,\"username\":\"" + username + "\"}";
             string responseString = await webClient.getLoginResponse(loginString, uri);
             return JsonConvert.DeserializeObject<SubitoLoginDetail>(responseString);
+        }
+
+        public async Task<bool> DeleteInsertion(SubitoLoginDetail loginData, Ad ad,SubitoWebClient subitoWebClient)
+        {
+            Uri uri = new Uri(COOKIESURL + "/users/" + loginData.user_id + "/ads/" + ad.urn + "?delete_reason=sold_on_subito");
+            bool result = await subitoWebClient.DeleteRequest(uri);
+            return result;
         }
 
     }
