@@ -47,11 +47,17 @@ namespace SubitoNotifier.Helper
             //this writes the body of the request
             WriteRequestBody(request, loginData);
 
-            //setting the cookies for the class. all next requests will have these cookies
-            container = request.CookieContainer = new CookieContainer();
+            //initialize the cookie container
 
-            //return the response string
-            return readResponse(await request.GetResponseAsync());
+            container = request.CookieContainer = new CookieContainer();
+            //calls the response and then set the cookiecontainer to be used in every next https call
+            var response = await request.GetResponseAsync();
+            CookieContainer = container;
+            //read the content of the response and return it as a string
+            using (var reader = new StreamReader(response.GetResponseStream()))
+            {
+                return reader.ReadToEnd();
+            }
 
         }
 
